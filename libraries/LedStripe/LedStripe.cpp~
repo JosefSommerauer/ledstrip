@@ -1,0 +1,145 @@
+#include "LedStripe.h"
+
+#include <SoftPWM.h>
+
+
+
+T_YUV rgbToYuv(T_RGB rgb) {
+  T_YUV ret;
+  ret.Y = (0.257 * rgb.R) + (0.504 * rgb.G) + (0.098 * rgb.B) + 16;
+  ret.Cr = (0.439 * rgb.R) - (0.368 * rgb.G) - (0.071 * rgb.B) + 128;
+  ret.Cb = -(0.148 * rgb.R) - (0.291 * rgb.G) + (0.439 * rgb.B) + 128;
+  
+  if(ret.Y < 0x00) ret.Y = 0x00;
+  if(ret.Cr < 0x00) ret.Cr = 0x00;
+  if(ret.Cb < 0x00) ret.Cb = 0x00;
+  if(ret.Y > 0xFF) ret.Y = 0xFF;
+  if(ret.Cr > 0xFF) ret.Cr = 0xFF;
+  if(ret.Cb > 0xFF) ret.Cb = 0xFF;
+  
+  return ret;
+}
+
+T_RGB yuvToRgb(T_YUV yuv) {
+  T_RGB ret;
+  ret.B = 1.164*(yuv.Y - 16) + 2.018*(yuv.Cb - 128);
+  ret.G = 1.164*(yuv.Y - 16) - 0.813*(yuv.Cr - 128) - 0.391*(yuv.Cb - 128);
+  ret.R = 1.164*(yuv.Y - 16) + 1.596*(yuv.Cr - 128);
+  
+  if(ret.R < 0x00) ret.R = 0x00;
+  if(ret.G < 0x00) ret.G = 0x00;
+  if(ret.B < 0x00) ret.B = 0x00;
+  if(ret.R > 0xFF) ret.R = 0xFF;
+  if(ret.G > 0xFF) ret.G = 0xFF;
+  if(ret.B > 0xFF) ret.B = 0xFF;
+  
+  return ret;
+}
+
+LedStripe::LedStripe(int red, int green, int blue) {
+	red_pin = red;
+	blue_pin = blue;
+	green_pin = green;
+
+	SoftPWMSet(red, 0);
+	SoftPWMSet(green, 0);
+	SoftPWMSet(blue, 0);
+	
+	mRed = 0;
+	mGreen = 0;
+	mBlue = 0;
+	mBrightness = 10;
+
+	SoftPWMSetFadeTime(red, length, length);
+	SoftPWMSetFadeTime(green, length, length);
+	SoftPWMSetFadeTime(blue, length, length);
+}
+
+void LedStripe::SetColor(int red, int green, int blue) {
+	SoftPWMSet(red_pin, red);
+	SoftPWMSet(green_pin, green);
+	SoftPWMSet(blue_pin, blue);
+	
+	mRed = red;
+	mGreen = green;
+	mBlue = blue;
+	
+	T_RGB curRgb = {red, green, blue};	
+	T_YUV curYuv = rgbToYuv(curRgb);	
+	mBrightness = curYuv.Y;
+}
+
+void LedStripe::SetColor(int red, int green, int blue, int brightness) {
+	T_RGB curRgb = {red, green, blue};	
+	T_YUV curYuv = rgbToYuv(curRgb);	
+	curYuv.Y = brightness;
+	curRgb = yuvToRgb(curYuv);
+		
+	mRed = red;
+	mGreen = green;
+	mBlue = blue;
+	
+	SoftPWMSet(red_pin, mRed);
+	SoftPWMSet(green_pin, mGreen);
+	SoftPWMSet(blue_pin, mBlue);
+}
+
+void LedStripe::SetColorKeepBrightness(int red, int green, int blue) {
+	T_RGB curRgb = {red, green, blue};	
+	T_YUV curYuv = rgbToYuv(curRgb);	
+	curYuv.Y = mBrightness;
+	curRgb = yuvToRgb(curYuv);
+		
+	mRed = red;
+	mGreen = green;
+	mBlue = blue;
+	
+	SoftPWMSet(red_pin, curRgb.R);
+	SoftPWMSet(green_pin, curRgb.G);
+	SoftPWMSet(blue_pin, curRgb.B);
+}
+
+void LedStripe::Off() {
+	SoftPWMSet(red_pin, 0x00);
+	SoftPWMSet(green_pin, 0x00);
+	SoftPWMSet(blue_pin, 0x00);
+}
+
+void LedStripe::On() {
+	SetColor(0xFF,0xFF,0xFF);
+}
+
+void LedStripe::SetBrightness(int val) {
+	if(val > 0xEB || val < 0x00) {
+		return;
+	}
+
+	T_RGB curRgb = {mRed, mGreen, mBlue};	
+	T_YUV curYuv = rgbToYuv(curRgb);	
+	mBrightness = curYuv.Y = val;
+	curRgb = yuvToRgb(curYuv);	
+	SetColor(curRgb.R, curRgb.G, curRgb.B);
+}
+
+void LedStripe::IncBrightness() {
+	SetBrightness(mBrightness + 10);
+}
+
+void LedStripe::DecBrightness() {
+	SetBrightness(mBrightness - 10);
+}
+
+T_RGB LedStripe::getRGB() {
+	T_RGB ret = {mRed, mGreen, mBlue};
+	
+	return ret;
+}
+
+T_YUV LedStripe::getYUV() {
+	T_RGB curRgb = {mRed, mGreen, mBlue};	
+	T_YUV ret = rgbToYuv(curRgb);	
+	
+	return ret;
+}
+  
+
